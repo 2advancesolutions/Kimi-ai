@@ -8,28 +8,46 @@ todos = {}
 def lambda_handler(event, context):
     """
     Main Lambda handler for todo API
+    Supports both Lambda Function URL and API Gateway formats
     """
     
     # Add CORS headers for frontend integration
     headers = {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
         'Access-Control-Allow-Methods': 'OPTIONS,GET,POST,PUT,DELETE'
     }
     
     try:
         # Handle preflight OPTIONS request
-        if event.get('httpMethod') == 'OPTIONS':
+        if event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS' or \
+           event.get('httpMethod') == 'OPTIONS':
             return {
                 'statusCode': 200,
                 'headers': headers,
                 'body': ''
             }
         
-        # Parse the request path and method
-        http_method = event.get('httpMethod', 'GET')
-        path = event.get('path', '/')
+        # Parse the request for both Lambda Function URL and API Gateway formats
+        if 'requestContext' in event and 'http' in event.get('requestContext', {}):
+            # Lambda Function URL format
+            http_method = event['requestContext']['http']['method']
+            path = event['requestContext']['http']['path']
+            body = event.get('body', '{}') if event.get('body') else '{}'
+        else:
+            # API Gateway format (backward compatibility)
+            http_method = event.get('httpMethod', 'GET')
+            path = event.get('path', '/')
+            body = event.get('body', '{}')
+        
+        # Parse JSON body if present
+        try:
+            body_data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            body_data = {}
+        
+        print(f"Method: {http_method}, Path: {path}, Body: {body_data}")
         
         # Route to appropriate handler
         if http_method == 'GET' and path == '/todos':
@@ -38,12 +56,10 @@ def lambda_handler(event, context):
             todo_id = path.split('/')[-1]
             return get_todo_by_id(todo_id, headers)
         elif http_method == 'POST' and path == '/todos':
-            body = json.loads(event.get('body', '{}'))
-            return create_todo(body, headers)
+            return create_todo(body_data, headers)
         elif http_method == 'PUT' and path.startswith('/todos/'):
             todo_id = path.split('/')[-1]
-            body = json.loads(event.get('body', '{}'))
-            return update_todo(todo_id, body, headers)
+            return update_todo(todo_id, body_data, headers)
         elif http_method == 'DELETE' and path.startswith('/todos/'):
             todo_id = path.split('/')[-1]
             return delete_todo(todo_id, headers)
@@ -51,10 +67,11 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 404,
                 'headers': headers,
-                'body': json.dumps({'error': 'Endpoint not found'})
+                'body': json.dumps({'error': 'Endpoint not found', 'path': path, 'method': http_method})
             }
             
     except Exception as e:
+        print(f"Error: {str(e)}")
         return {
             'statusCode': 500,
             'headers': headers,
