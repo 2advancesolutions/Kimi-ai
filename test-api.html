@@ -1,24 +1,208 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>API Test</title>
+    <title>API Test - Todo Lambda Function</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #d00;
+        }
+        .success {
+            background: #e6ffe6;
+            color: #060;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
 </head>
 <body>
-    <h1>Testing API Connection</h1>
-    <button onclick="testAPI()">Test API</button>
-    <div id="result"></div>
+    <h1>Todo API Testing Interface</h1>
+    <p>This page tests the Lambda function URL directly to help diagnose connection issues.</p>
+    
+    <div class="test-section">
+        <h3>1. Test GET /todos</h3>
+        <button onclick="testGetTodos()">Test GET</button>
+        <div id="get-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Test POST /todos</h3>
+        <input type="text" id="todo-text" placeholder="Enter todo text" value="Test todo item">
+        <button onclick="testPostTodo()">Test POST</button>
+        <div id="post-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Test CORS Preflight</h3>
+        <button onclick="testCors()">Test CORS OPTIONS</button>
+        <div id="cors-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Debug Information</h3>
+        <button onclick="showDebugInfo()">Show Debug Info</button>
+        <div id="debug-result" class="result"></div>
+    </div>
 
     <script>
-        async function testAPI() {
-            const result = document.getElementById('result');
+        const API_URL = 'https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws';
+
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        async function testGetTodos() {
+            const resultEl = document.getElementById('get-result');
+            resultEl.textContent = 'Loading...';
+            resultEl.className = 'result loading';
+
             try {
-                const response = await fetch('https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws/todos');
-                const data = await response.json();
-                result.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                console.log('Testing GET request to:', `${API_URL}/todos`);
+                
+                const response = await fetch(`${API_URL}/todos`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors'
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                const responseText = await response.text();
+                console.log('Response body:', responseText);
+
+                if (response.ok) {
+                    const data = JSON.parse(responseText);
+                    showResult('get-result', `Status: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult('get-result', `Error Status: ${response.status}\nResponse: ${responseText}`, true);
+                }
             } catch (error) {
-                result.innerHTML = 'Error: ' + error.message;
+                console.error('Fetch error:', error);
+                showResult('get-result', `Fetch Error: ${error.message}\n\nThis usually indicates:\n1. CORS issues\n2. Lambda function URL not configured for public access\n3. Network connectivity issues\n4. Lambda function not deployed correctly`, true);
             }
         }
+
+        async function testPostTodo() {
+            const resultEl = document.getElementById('post-result');
+            const text = document.getElementById('todo-text').value || 'Test todo';
+            
+            resultEl.textContent = 'Posting...';
+            resultEl.className = 'result loading';
+
+            try {
+                console.log('Testing POST request with text:', text);
+                
+                const response = await fetch(`${API_URL}/todos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text }),
+                    mode: 'cors'
+                });
+
+                console.log('Response status:', response.status);
+                const responseText = await response.text();
+                console.log('Response body:', responseText);
+
+                if (response.ok) {
+                    const data = JSON.parse(responseText);
+                    showResult('post-result', `Status: ${response.status}\nCreated: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult('post-result', `Error Status: ${response.status}\nResponse: ${responseText}`, true);
+                }
+            } catch (error) {
+                console.error('POST error:', error);
+                showResult('post-result', `POST Error: ${error.message}`, true);
+            }
+        }
+
+        async function testCors() {
+            const resultEl = document.getElementById('cors-result');
+            resultEl.textContent = 'Testing CORS...';
+            resultEl.className = 'result loading';
+
+            try {
+                console.log('Testing CORS preflight request...');
+                
+                const response = await fetch(`${API_URL}/todos`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type',
+                    },
+                    mode: 'cors'
+                });
+
+                console.log('CORS Response status:', response.status);
+                console.log('CORS Response headers:', Object.fromEntries(response.headers.entries()));
+
+                const responseText = await response.text();
+                
+                showResult('cors-result', 
+                    `CORS Status: ${response.status}\n` +
+                    `Access-Control-Allow-Origin: ${response.headers.get('access-control-allow-origin') || 'NOT SET'}\n` +
+                    `Access-Control-Allow-Methods: ${response.headers.get('access-control-allow-methods') || 'NOT SET'}\n` +
+                    `Access-Control-Allow-Headers: ${response.headers.get('access-control-allow-headers') || 'NOT SET'}\n` +
+                    `Response: ${responseText}`
+                );
+            } catch (error) {
+                console.error('CORS error:', error);
+                showResult('cors-result', `CORS Error: ${error.message}`, true);
+            }
+        }
+
+        function showDebugInfo() {
+            const debugEl = document.getElementById('debug-result');
+            
+            const info = {
+                'Current Origin': window.location.origin,
+                'API URL': API_URL,
+                'User Agent': navigator.userAgent,
+                'Timestamp': new Date().toISOString(),
+                'Browser CORS Support': 'fetch' in window && 'cors' in new Request(''),
+                'Protocol': window.location.protocol
+            };
+
+            debugEl.textContent = JSON.stringify(info, null, 2);
+            debugEl.className = 'result';
+        }
+
+        // Run initial debug info
+        showDebugInfo();
     </script>
 </body>
 </html>
