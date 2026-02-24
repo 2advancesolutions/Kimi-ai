@@ -4,35 +4,60 @@ import './TodoItem.css';
 function TodoItem({ todo, onToggle, onDelete, onEdit }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(todo.text);
+  const [loading, setLoading] = useState(false);
 
-  const handleEdit = () => {
-    if (editText.trim() && editText !== todo.text) {
-      onEdit(todo.id, editText.trim());
+  const handleToggle = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await onToggle(todo.id);
+    } finally {
+      setLoading(false);
     }
-    setIsEditing(false);
   };
 
-  const handleCancel = () => {
-    setEditText(todo.text);
-    setIsEditing(false);
+  const handleDelete = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await onDelete(todo.id);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (editText.trim() && editText !== todo.text) {
+      setLoading(true);
+      try {
+        await onEdit(todo.id, editText.trim());
+        setIsEditing(false);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setIsEditing(false);
+    }
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleEdit();
     } else if (e.key === 'Escape') {
-      handleCancel();
+      setEditText(todo.text);
+      setIsEditing(false);
     }
   };
 
   return (
-    <li className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+    <li className={`todo-item ${todo.completed ? 'completed' : ''} ${loading ? 'loading' : ''}`}>
       <div className="todo-content">
         <input
           type="checkbox"
           checked={todo.completed}
-          onChange={() => onToggle(todo.id)}
+          onChange={handleToggle}
           className="todo-checkbox"
+          disabled={loading}
         />
         
         {isEditing ? (
@@ -40,10 +65,11 @@ function TodoItem({ todo, onToggle, onDelete, onEdit }) {
             type="text"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            onBlur={handleEdit}
             onKeyDown={handleKeyDown}
-            className="edit-input"
+            onBlur={handleEdit}
+            className="todo-edit-input"
             autoFocus
+            disabled={loading}
           />
         ) : (
           <span 
@@ -58,19 +84,19 @@ function TodoItem({ todo, onToggle, onDelete, onEdit }) {
       <div className="todo-actions">
         {!isEditing && (
           <button
+            className="todo-edit-btn"
             onClick={() => setIsEditing(true)}
-            className="action-button edit-button"
-            title="Edit todo"
+            disabled={loading}
           >
-            ✏️
+            Edit
           </button>
         )}
         <button
-          onClick={() => onDelete(todo.id)}
-          className="action-button delete-button"
-          title="Delete todo"
+          className="todo-delete-btn"
+          onClick={handleDelete}
+          disabled={loading}
         >
-          🗑️
+          Delete
         </button>
       </div>
     </li>
