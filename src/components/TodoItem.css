@@ -2,17 +2,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 0;
+  padding: 16px;
   border-bottom: 1px solid #eee;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
 .todo-item:hover {
-  background-color: #f9f9f9;
+  background-color: #f8f9fa;
 }
 
-.todo-item:last-child {
-  border-bottom: none;
+.todo-item.completed {
+  opacity: 0.7;
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.todo-item.loading {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .todo-content {
@@ -35,57 +46,68 @@
   color: #333;
   cursor: pointer;
   user-select: none;
-  transition: color 0.2s ease;
 }
 
-.todo-item.completed .todo-text {
-  color: #999;
-  text-decoration: line-through;
-}
-
-.edit-input {
+.todo-edit-input {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 2px solid #667eea;
   border-radius: 4px;
   font-size: 16px;
   background: white;
 }
 
-.edit-input:focus {
+.todo-edit-input:focus {
   outline: none;
-  border-color: #667eea;
 }
 
 .todo-actions {
   display: flex;
   gap: 8px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
 }
 
-.todo-item:hover .todo-actions {
-  opacity: 1;
-}
-
-.action-button {
-  background: none;
+.todo-edit-btn,
+.todo-delete-btn {
+  padding: 6px 12px;
   border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 8px;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.action-button:hover {
-  background-color: #f0f0f0;
+.todo-edit-btn {
+  background: #f0f0f0;
+  color: #333;
 }
 
-.delete-button:hover {
-  background-color: #ffe0e0;
+.todo-edit-btn:hover:not(:disabled) {
+  background: #e0e0e0;
 }
 
-.edit-button:hover {
-  background-color: #e0f0ff;
+.todo-delete-btn {
+  background: #ff4757;
+  color: white;
+}
+
+.todo-delete-btn:hover:not(:disabled) {
+  background: #ff3742;
+}
+
+.todo-edit-btn:disabled,
+.todo-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .todo-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .todo-actions {
+    justify-content: flex-end;
+  }
 }
