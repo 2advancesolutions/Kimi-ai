@@ -11,6 +11,7 @@ function App() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Fetch todos from API
   const fetchTodos = async () => {
@@ -25,24 +26,49 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        mode: 'cors'
+        mode: 'cors',
+        cache: 'no-cache'
       });
       
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
-        throw new Error(`Failed to fetch todos: ${response.status} ${response.statusText}`);
+        
+        // Handle specific error cases
+        if (response.status === 403) {
+          throw new Error('Access forbidden. Please check Lambda function URL configuration.');
+        } else if (response.status === 404) {
+          throw new Error('API endpoint not found. Please verify the Lambda function URL.');
+        } else if (response.status === 0) {
+          throw new Error('Network error. This is likely a CORS or connectivity issue.');
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        }
       }
       
       const data = await response.json();
       console.log('Fetched data:', data);
-      setTodos(data.todos || []);
+      
+      // Handle both possible response formats
+      const todoList = data.todos || data || [];
+      setTodos(Array.isArray(todoList) ? todoList : []);
+      
     } catch (err) {
       console.error('Error fetching todos:', err);
-      setError(err.message);
+      
+      // Provide more helpful error messages
+      let userMessage = err.message;
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        userMessage = 'Unable to connect to the API. This could be due to:\n' +
+                     '1. CORS configuration issues\n' +
+                     '2. Lambda function URL not publicly accessible\n' +
+                     '3. Network connectivity problems\n' +
+                     '4. Lambda function not deployed';
+      }
+      
+      setError(userMessage);
     } finally {
       setLoading(false);
     }
@@ -50,7 +76,7 @@ function App() {
 
   useEffect(() => {
     fetchTodos();
-  }, []);
+  }, [retryCount]);
 
   const addTodo = async (text) => {
     try {
@@ -65,7 +91,7 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to add todo: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to add todo: ${response.status} ${errorText}`);
       }
 
       const newTodo = await response.json();
@@ -92,7 +118,7 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to update todo: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to update todo: ${response.status} ${errorText}`);
       }
 
       const updatedTodo = await response.json();
@@ -114,7 +140,7 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to delete todo: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to delete todo: ${response.status} ${errorText}`);
       }
 
       setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
@@ -137,7 +163,7 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to update todo: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to update todo: ${response.status} ${errorText}`);
       }
 
       const updatedTodo = await response.json();
@@ -155,7 +181,7 @@ function App() {
       const completedTodos = todos.filter(todo => todo.completed);
       
       // Delete all completed todos
-      await Promise.all(
+      const results = await Promise.allSettled(
         completedTodos.map(todo => 
           fetch(`${API_URL}/todos/${todo.id}`, {
             method: 'DELETE',
@@ -164,11 +190,21 @@ function App() {
         )
       );
 
+      // Check for any failures
+      const failures = results.filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn(`${failures.length} todos failed to delete`);
+      }
+
       setTodos(prevTodos => prevTodos.filter(todo => !todo.completed));
     } catch (err) {
       setError(err.message);
       console.error('Error clearing completed todos:', err);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
   };
 
   const filteredTodos = todos.filter(todo => {
@@ -191,7 +227,10 @@ function App() {
         <div className="todo-container">
           <div className="loading">
             <div className="loading-spinner"></div>
-            Loading todos...
+            <div>Loading todos...</div>
+            <div style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
+              Connecting to AWS Lambda...
+            </div>
           </div>
         </div>
       </div>
@@ -209,31 +248,46 @@ function App() {
         {error && (
           <div className="error-message">
             <div className="error-content">
-              <strong>Connection Error:</strong> {error}
-              <br />
-              <small>Make sure the Lambda function URL is properly configured with CORS and public access.</small>
+              <strong>Connection Error:</strong>
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', margin: '10px 0' }}>
+                {error}
+              </pre>
             </div>
-            <button onClick={fetchTodos} className="retry-btn">Retry Connection</button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '15px' }}>
+              <button onClick={handleRetry} className="retry-btn">Retry Connection</button>
+              <button onClick={() => window.open('test-api.html', '_blank')} className="retry-btn">
+                Test API Directly
+              </button>
+            </div>
           </div>
         )}
         
         <TodoInput onAddTodo={addTodo} />
         
-        <TodoList
-          todos={filteredTodos}
-          onToggleTodo={toggleTodo}
-          onDeleteTodo={deleteTodo}
-          onEditTodo={editTodo}
-        />
-        
         {todos.length > 0 && (
-          <TodoFilters
-            filter={filter}
-            onFilterChange={setFilter}
-            activeCount={activeCount}
-            completedCount={completedCount}
-            onClearCompleted={clearCompleted}
-          />
+          <>
+            <TodoList
+              todos={filteredTodos}
+              onToggleTodo={toggleTodo}
+              onDeleteTodo={deleteTodo}
+              onEditTodo={editTodo}
+            />
+            
+            <TodoFilters
+              filter={filter}
+              onFilterChange={setFilter}
+              activeCount={activeCount}
+              completedCount={completedCount}
+              onClearCompleted={clearCompleted}
+            />
+          </>
+        )}
+        
+        {!error && todos.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            <div style={{ fontSize: '1.2em', marginBottom: '10px' }}>No todos yet!</div>
+            <div>Add your first todo above to get started.</div>
+          </div>
         )}
       </div>
     </div>
