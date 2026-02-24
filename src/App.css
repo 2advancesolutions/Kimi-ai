@@ -46,6 +46,23 @@ header h1 {
   font-size: 1.2rem;
 }
 
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .error-message {
   background: #fee;
   border: 1px solid #fcc;
@@ -54,6 +71,16 @@ header h1 {
   margin-bottom: 20px;
   text-align: center;
   color: #c33;
+}
+
+.error-content {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.error-content small {
+  color: #666;
+  font-size: 0.9em;
 }
 
 .retry-btn {
@@ -65,10 +92,15 @@ header h1 {
   border-radius: 5px;
   cursor: pointer;
   font-size: 0.9rem;
+  transition: background-color 0.2s;
 }
 
 .retry-btn:hover {
   background: #5a6fd8;
+}
+
+.retry-btn:active {
+  transform: translateY(1px);
 }
 
 @media (max-width: 600px) {
@@ -82,5 +114,10 @@ header h1 {
   
   header h1 {
     font-size: 2rem;
+  }
+  
+  .error-message {
+    padding: 10px;
+    font-size: 0.9rem;
   }
 }
