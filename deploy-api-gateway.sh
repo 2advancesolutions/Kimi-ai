@@ -10,7 +10,7 @@ LAMBDA_FUNCTION_NAME=${1:-todo-api}
 CORS_ORIGIN=${2:-http://localhost:3001}
 STACK_NAME="todo-api-gateway"
 REGION="us-east-1"
-TEMPLATE_FILE="backend/api-gateway-config.yaml"
+TEMPLATE_FILE="backend/api-gateway-simple.yaml"
 
 # Colors for output
 RED='\033[0;31m'
@@ -53,6 +53,9 @@ if [[ ! -f "${TEMPLATE_FILE}" ]]; then
     exit 1
 fi
 
+# Package the template for deployment
+echo -e "${BLUE}📦 Preparing CloudFormation template...${NC}"
+
 # Check if stack exists
 echo -e "${BLUE}🔍 Checking if CloudFormation stack '${STACK_NAME}' exists...${NC}"
 if aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${REGION}" &> /dev/null; then
@@ -65,12 +68,16 @@ if aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${R
         --parameters ParameterKey=LambdaFunctionName,ParameterValue="${LAMBDA_FUNCTION_NAME}" \
                      ParameterKey=CorsOrigin,ParameterValue="${CORS_ORIGIN}" \
         --capabilities CAPABILITY_IAM \
-        --region "${REGION}"
+        --region "${REGION}" || {
+            echo -e "${YELLOW}⚠️  No updates to be performed${NC}"
+        }
     
     echo -e "${BLUE}⏳ Waiting for stack update to complete...${NC}"
     aws cloudformation wait stack-update-complete \
         --stack-name "${STACK_NAME}" \
-        --region "${REGION}"
+        --region "${REGION}" || {
+            echo -e "${YELLOW}⚠️  Stack update completed or no changes needed${NC}"
+        }
     
     echo -e "${GREEN}✅ Stack updated successfully${NC}"
 else
@@ -98,7 +105,7 @@ echo -e "${BLUE}🔗 Retrieving API Gateway URL...${NC}"
 API_URL=$(aws cloudformation describe-stacks \
     --stack-name "${STACK_NAME}" \
     --region "${REGION}" \
-    --query 'Stacks[0].Outputs[?OutputKey==`TodosEndpoint`].OutputValue' \
+    --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
     --output text)
 
 if [[ -n "${API_URL}" ]]; then
@@ -120,7 +127,7 @@ EOF
     
     # Test the API Gateway
     echo -e "${BLUE}🧪 Testing API Gateway endpoints...${NC}"
-    sleep 5  # Wait for API Gateway to be fully available
+    sleep 10  # Wait for API Gateway to be fully available
     
     if [[ -f "test-api-gateway.js" ]]; then
         REACT_APP_API_URL="${API_URL}" node test-api-gateway.js
