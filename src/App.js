@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import TodoInput from './components/TodoInput';
 import TodoList from './components/TodoList';
 import TodoFilters from './components/TodoFilters';
+import { API_CONFIG, buildApiUrl, handleApiError, getRequestConfig } from './config/api';
 import './App.css';
-
-const API_URL = 'https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws';
 
 function App() {
   const [todos, setTodos] = useState([]);
@@ -19,34 +18,12 @@ function App() {
       setLoading(true);
       setError(null);
       
-      console.log('Fetching from:', `${API_URL}/todos`);
+      const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.TODOS);
+      console.log('Fetching from:', apiUrl);
+      console.log('API Type:', API_CONFIG.TYPE);
       
-      const response = await fetch(`${API_URL}/todos`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        cache: 'no-cache'
-      });
-      
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        
-        // Handle specific error cases
-        if (response.status === 403) {
-          throw new Error('Access forbidden. Please check Lambda function URL configuration.');
-        } else if (response.status === 404) {
-          throw new Error('API endpoint not found. Please verify the Lambda function URL.');
-        } else if (response.status === 0) {
-          throw new Error('Network error. This is likely a CORS or connectivity issue.');
-        } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-        }
-      }
+      const response = await fetch(apiUrl, getRequestConfig('GET'));
+      await handleApiError(response);
       
       const data = await response.json();
       console.log('Fetched data:', data);
@@ -57,18 +34,7 @@ function App() {
       
     } catch (err) {
       console.error('Error fetching todos:', err);
-      
-      // Provide more helpful error messages
-      let userMessage = err.message;
-      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        userMessage = 'Unable to connect to the API. This could be due to:\n' +
-                     '1. CORS configuration issues\n' +
-                     '2. Lambda function URL not publicly accessible\n' +
-                     '3. Network connectivity problems\n' +
-                     '4. Lambda function not deployed';
-      }
-      
-      setError(userMessage);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -80,113 +46,96 @@ function App() {
 
   const addTodo = async (text) => {
     try {
-      const response = await fetch(`${API_URL}/todos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to add todo: ${response.status} ${errorText}`);
-      }
-
+      setError(null);
+      
+      const response = await fetch(
+        buildApiUrl(API_CONFIG.ENDPOINTS.TODOS),
+        getRequestConfig('POST', { text })
+      );
+      
+      await handleApiError(response);
       const newTodo = await response.json();
       setTodos(prevTodos => [...prevTodos, newTodo]);
     } catch (err) {
-      setError(err.message);
       console.error('Error adding todo:', err);
+      setError(err.message);
     }
   };
 
   const toggleTodo = async (id) => {
     try {
+      setError(null);
+      
       const todo = todos.find(t => t.id === id);
       if (!todo) return;
 
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ completed: !todo.completed }),
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update todo: ${response.status} ${errorText}`);
-      }
-
+      const response = await fetch(
+        buildApiUrl(API_CONFIG.ENDPOINTS.TODO(id)),
+        getRequestConfig('PUT', { completed: !todo.completed })
+      );
+      
+      await handleApiError(response);
       const updatedTodo = await response.json();
+      
       setTodos(prevTodos => 
         prevTodos.map(t => t.id === id ? updatedTodo : t)
       );
     } catch (err) {
-      setError(err.message);
       console.error('Error toggling todo:', err);
+      setError(err.message);
     }
   };
 
   const deleteTodo = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: 'DELETE',
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to delete todo: ${response.status} ${errorText}`);
-      }
-
+      setError(null);
+      
+      const response = await fetch(
+        buildApiUrl(API_CONFIG.ENDPOINTS.TODO(id)),
+        getRequestConfig('DELETE')
+      );
+      
+      await handleApiError(response);
       setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
     } catch (err) {
-      setError(err.message);
       console.error('Error deleting todo:', err);
+      setError(err.message);
     }
   };
 
   const editTodo = async (id, newText) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: newText }),
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update todo: ${response.status} ${errorText}`);
-      }
-
+      setError(null);
+      
+      const response = await fetch(
+        buildApiUrl(API_CONFIG.ENDPOINTS.TODO(id)),
+        getRequestConfig('PUT', { text: newText })
+      );
+      
+      await handleApiError(response);
       const updatedTodo = await response.json();
+      
       setTodos(prevTodos => 
         prevTodos.map(t => t.id === id ? updatedTodo : t)
       );
     } catch (err) {
-      setError(err.message);
       console.error('Error editing todo:', err);
+      setError(err.message);
     }
   };
 
   const clearCompleted = async () => {
     try {
+      setError(null);
       const completedTodos = todos.filter(todo => todo.completed);
       
       // Delete all completed todos
       const results = await Promise.allSettled(
         completedTodos.map(todo => 
-          fetch(`${API_URL}/todos/${todo.id}`, {
-            method: 'DELETE',
-            mode: 'cors'
-          })
+          fetch(
+            buildApiUrl(API_CONFIG.ENDPOINTS.TODO(todo.id)),
+            getRequestConfig('DELETE')
+          ).then(handleApiError)
         )
       );
 
@@ -198,8 +147,8 @@ function App() {
 
       setTodos(prevTodos => prevTodos.filter(todo => !todo.completed));
     } catch (err) {
-      setError(err.message);
       console.error('Error clearing completed todos:', err);
+      setError(err.message);
     }
   };
 
@@ -229,7 +178,7 @@ function App() {
             <div className="loading-spinner"></div>
             <div>Loading todos...</div>
             <div style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
-              Connecting to AWS Lambda...
+              Connecting to {API_CONFIG.TYPE === 'api-gateway' ? 'API Gateway' : 'Lambda Function'}...
             </div>
           </div>
         </div>
@@ -243,6 +192,9 @@ function App() {
         <header>
           <h1>Todo App</h1>
           <p className="subtitle">Stay organized and productive</p>
+          <div style={{ fontSize: '0.8em', color: '#666', marginTop: '5px' }}>
+            API: {API_CONFIG.TYPE} ({API_CONFIG.BASE_URL})
+          </div>
         </header>
         
         {error && (
