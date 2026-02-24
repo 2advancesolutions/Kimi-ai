@@ -7,8 +7,14 @@ function TodoInput({ onAddTodo }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      onAddTodo(inputValue);
+      onAddTodo(inputValue.trim());
       setInputValue('');
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
     }
   };
 
@@ -18,11 +24,13 @@ function TodoInput({ onAddTodo }) {
         type="text"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="What needs to be done?"
         className="todo-input-field"
+        maxLength={200}
       />
       <button type="submit" className="add-button">
-        Add
+        Add Todo
       </button>
     </form>
   );

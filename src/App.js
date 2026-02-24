@@ -1,36 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import TodoInput from './components/TodoInput';
 import TodoList from './components/TodoList';
 import TodoFilters from './components/TodoFilters';
+import './App.css';
 
 function App() {
-  const [todos, setTodos] = useState([]);
+  const [todos, setTodos] = useState(() => {
+    const saved = localStorage.getItem('todos');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [filter, setFilter] = useState('all');
 
-  // Load todos from localStorage on initial render
-  useEffect(() => {
-    const savedTodos = localStorage.getItem('todos');
-    if (savedTodos) {
-      setTodos(JSON.parse(savedTodos));
-    }
-  }, []);
-
-  // Save todos to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
   }, [todos]);
 
   const addTodo = (text) => {
-    if (text.trim()) {
-      const newTodo = {
-        id: Date.now(),
-        text: text.trim(),
-        completed: false,
-        createdAt: new Date().toISOString()
-      };
-      setTodos([...todos, newTodo]);
-    }
+    const newTodo = {
+      id: Date.now(),
+      text,
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+    setTodos([...todos, newTodo]);
   };
 
   const toggleTodo = (id) => {
@@ -54,12 +46,18 @@ function App() {
   };
 
   const filteredTodos = todos.filter(todo => {
-    if (filter === 'active') return !todo.completed;
-    if (filter === 'completed') return todo.completed;
-    return true;
+    switch (filter) {
+      case 'active':
+        return !todo.completed;
+      case 'completed':
+        return todo.completed;
+      default:
+        return true;
+    }
   });
 
-  const activeTodosCount = todos.filter(todo => !todo.completed).length;
+  const activeCount = todos.filter(todo => !todo.completed).length;
+  const completedCount = todos.filter(todo => todo.completed).length;
 
   return (
     <div className="App">
@@ -71,7 +69,7 @@ function App() {
         
         <TodoInput onAddTodo={addTodo} />
         
-        <TodoList 
+        <TodoList
           todos={filteredTodos}
           onToggleTodo={toggleTodo}
           onDeleteTodo={deleteTodo}
@@ -82,8 +80,8 @@ function App() {
           <TodoFilters
             filter={filter}
             onFilterChange={setFilter}
-            activeCount={activeTodosCount}
-            completedCount={todos.length - activeTodosCount}
+            activeCount={activeCount}
+            completedCount={completedCount}
             onClearCompleted={clearCompleted}
           />
         )}
