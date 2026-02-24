@@ -2,19 +2,19 @@ import React, { useState } from 'react';
 import './TodoInput.css';
 
 function TodoInput({ onAddTodo }) {
-  const [inputValue, setInputValue] = useState('');
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      onAddTodo(inputValue.trim());
-      setInputValue('');
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e);
+    if (text.trim() && !loading) {
+      setLoading(true);
+      try {
+        await onAddTodo(text.trim());
+        setText('');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -22,15 +22,14 @@ function TodoInput({ onAddTodo }) {
     <form onSubmit={handleSubmit} className="todo-input">
       <input
         type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         placeholder="What needs to be done?"
         className="todo-input-field"
-        maxLength={200}
+        disabled={loading}
       />
-      <button type="submit" className="add-button">
-        Add Todo
+      <button type="submit" className="todo-add-button" disabled={!text.trim() || loading}>
+        {loading ? 'Adding...' : 'Add'}
       </button>
     </form>
   );
