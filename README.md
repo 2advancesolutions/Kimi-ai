@@ -52,11 +52,41 @@ https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws
    npm run build
    ```
 
-## API Testing
+## API Testing & Troubleshooting
+
+### Testing the API Connection
 
 You can test the API connection using the included `test-api.html` file:
 1. Open `test-api.html` in your browser
-2. Click "Test API" to verify the Lambda function is responding
+2. Use the testing interface to verify:
+   - GET requests return todos
+   - POST requests create new todos
+   - CORS preflight requests work correctly
+   - Debug information is displayed
+
+### Common Issues & Solutions
+
+If you encounter **403 Forbidden** or **CORS errors**, see the [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed troubleshooting steps.
+
+**Quick fixes for common issues:**
+
+1. **Lambda Function URL Configuration**:
+   ```bash
+   aws lambda update-function-url-config \
+     --function-name todo-api \
+     --auth-type NONE \
+     --cors-config '{"AllowCredentials":false,"AllowHeaders":["Content-Type"],"AllowMethods":["GET","POST","PUT","DELETE","OPTIONS"],"AllowOrigins":["*"],"MaxAge":86400}'
+   ```
+
+2. **Lambda Permissions**:
+   ```bash
+   aws lambda add-permission \
+     --function-name todo-api \
+     --statement-id FunctionURLAllowPublicAccess \
+     --action lambda:InvokeFunctionUrl \
+     --principal "*" \
+     --function-url-auth-type NONE
+   ```
 
 ## Project Structure
 
@@ -70,8 +100,8 @@ src/
 │   ├── TodoItem.js     # Individual todo item
 │   └── TodoFilters.js  # Filter controls
 backend/
-├── lambda_function.py  # AWS Lambda function
-└── api-gateway-config.yaml  # API Gateway configuration
+├── lambda_function.py  # AWS Lambda function (updated for function URLs)
+└── api-gateway-config.yaml  # API Gateway configuration (alternative)
 ```
 
 ## Error Handling
@@ -82,6 +112,34 @@ The application includes comprehensive error handling:
 - Loading states prevent duplicate submissions
 - Graceful degradation if API is unavailable
 
+## Development
+
+### Testing API Endpoints
+
+Use these curl commands to test the API directly:
+
+```bash
+# Test GET request
+curl -X GET https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws/todos
+
+# Test POST request
+curl -X POST https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws/todos \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Test todo from curl"}'
+
+# Test CORS preflight
+curl -X OPTIONS https://jk7gowff2esst3zhfk4vsp5rsy0lwxay.lambda-url.us-east-1.on.aws/todos \
+  -H "Origin: http://localhost:3000"
+```
+
+### Lambda Function Updates
+
+The Lambda function has been updated to handle both:
+- **Lambda Function URL** format (new)
+- **API Gateway** format (legacy)
+
+This ensures compatibility regardless of how the Lambda is deployed.
+
 ## Future Enhancements
 
 - [ ] Add user authentication
@@ -90,3 +148,11 @@ The application includes comprehensive error handling:
 - [ ] Implement drag-and-drop reordering
 - [ ] Add priority levels
 - [ ] Export/import functionality
+
+## Support
+
+If you encounter issues:
+1. Check the [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed troubleshooting
+2. Use `test-api.html` to diagnose connection problems
+3. Check browser DevTools for detailed error messages
+4. Verify Lambda function configuration using AWS CLI commands provided in the deployment guide
