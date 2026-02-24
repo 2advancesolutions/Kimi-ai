@@ -1,259 +1,222 @@
-# API Gateway Configuration for Todo API
-# This template creates a REST API Gateway that integrates with the Lambda function
-
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: API Gateway for Todo Lambda Function
+Description: API Gateway for Todo Lambda function with CORS support
 
 Parameters:
-  StageName:
-    Type: String
-    Default: prod
-    Description: API Gateway stage name
-  
   LambdaFunctionName:
     Type: String
     Default: todo-api
     Description: Name of the Lambda function to integrate with
+  
+  CorsOrigin:
+    Type: String
+    Default: http://localhost:3001
+    Description: CORS allowed origin
 
 Resources:
   # API Gateway REST API
   TodoApi:
-    Type: AWS::ApiGateway::RestApi
+    Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub '${AWS::StackName}-todo-api'
-      Description: REST API for Todo application
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: !Sub "'${CorsOrigin}'"
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          title: Todo API
+        schemes:
+          - https
+        paths:
+          /todos:
+            get:
+              summary: Get all todos
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TodoLambda.Arn}/invocations"
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "Success"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            post:
+              summary: Create a new todo
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TodoLambda.Arn}/invocations"
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "201":
+                  description: "Created"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            options:
+              summary: CORS preflight
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: |
+                    {
+                      "statusCode": 200
+                    }
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: !Sub "'${CorsOrigin}'"
+                    responseTemplates:
+                      application/json: |
+                        {}
+              responses:
+                "200":
+                  description: "CORS headers"
+                  headers:
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+          
+          /todos/{id}:
+            get:
+              summary: Get a specific todo
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  type: string
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TodoLambda.Arn}/invocations"
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "Success"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            put:
+              summary: Update a todo
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  type: string
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TodoLambda.Arn}/invocations"
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "Success"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            delete:
+              summary: Delete a todo
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  type: string
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TodoLambda.Arn}/invocations"
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "204":
+                  description: "No Content"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            options:
+              summary: CORS preflight
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: |
+                    {
+                      "statusCode": 200
+                    }
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: !Sub "'${CorsOrigin}'"
+                    responseTemplates:
+                      application/json: |
+                        {}
+              responses:
+                "200":
+                  description: "CORS headers"
+                  headers:
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Origin:
+                      type: "string"
 
-  # API Gateway Resource for /todos
-  TodosResource:
-    Type: AWS::ApiGateway::Resource
+  # Lambda function reference
+  TodoLambda:
+    Type: AWS::Lambda::Function
     Properties:
-      RestApiId: !Ref TodoApi
-      ParentId: !GetAtt TodoApi.RootResourceId
-      PathPart: todos
+      FunctionName: !Ref LambdaFunctionName
+      Runtime: python3.9
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Sub "${AWS::AccountId}-lambda-functions"
+        S3Key: todo-api.zip
 
-  # API Gateway Resource for /todos/{id}
-  TodoResource:
-    Type: AWS::ApiGateway::Resource
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
     Properties:
-      RestApiId: !Ref TodoApi
-      ParentId: !Ref TodosResource
-      PathPart: '{id}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-  # Lambda Permission for API Gateway
+  # Lambda permission for API Gateway
   LambdaApiGatewayPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref LambdaFunctionName
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TodoApi}/*/*'
-
-  # GET /todos - Get all todos
-  GetAllTodosMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodosResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}/invocations'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
-  # POST /todos - Create new todo
-  CreateTodoMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodosResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}/invocations'
-        IntegrationResponses:
-          - StatusCode: 201
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      MethodResponses:
-        - StatusCode: 201
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
-  # GET /todos/{id} - Get specific todo
-  GetTodoMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodoResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}/invocations'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
-  # PUT /todos/{id} - Update todo
-  UpdateTodoMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodoResource
-      HttpMethod: PUT
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}/invocations'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
-  # DELETE /todos/{id} - Delete todo
-  DeleteTodoMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodoResource
-      HttpMethod: DELETE
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}/invocations'
-        IntegrationResponses:
-          - StatusCode: 204
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      MethodResponses:
-        - StatusCode: 204
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
-  # OPTIONS methods for CORS preflight
-  TodosOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodosResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-            ResponseTemplates:
-              application/json: '{"statusCode": 200}'
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  TodoOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref TodoApi
-      ResourceId: !Ref TodoResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'http://localhost:3001'"
-            ResponseTemplates:
-              application/json: '{"statusCode": 200}'
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # API Gateway Deployment
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - GetAllTodosMethod
-      - CreateTodoMethod
-      - GetTodoMethod
-      - UpdateTodoMethod
-      - DeleteTodoMethod
-      - TodosOptionsMethod
-      - TodoOptionsMethod
-    Properties:
-      RestApiId: !Ref TodoApi
-      StageName: !Ref StageName
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TodoApi}/*/*"
 
 Outputs:
-  ApiGatewayUrl:
-    Description: URL of the API Gateway
-    Value: !Sub 'https://${TodoApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}'
-    Export:
-      Name: !Sub '${AWS::StackName}-api-url'
-  
   TodosEndpoint:
-    Description: Full endpoint for todos
-    Value: !Sub 'https://${TodoApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/todos'
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${TodoApi}.execute-api.${AWS::Region}.amazonaws.com/prod/todos"
     Export:
-      Name: !Sub '${AWS::StackName}-todos-endpoint'
+      Name: !Sub "${AWS::StackName}-Endpoint"
+
+  ApiGatewayId:
+    Description: API Gateway ID
+    Value: !Ref TodoApi
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiId"
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt TodoLambda.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaArn"

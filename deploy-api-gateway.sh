@@ -1,115 +1,152 @@
 #!/bin/bash
 
-# AWS API Gateway Deployment Script for Todo API
-# This script deploys the API Gateway configuration using AWS CLI
+# Deploy API Gateway for Todo Lambda function
+# Usage: ./deploy-api-gateway.sh [lambda-function-name] [cors-origin]
 
-echo "🚀 Starting API Gateway deployment for Todo API..."
+set -e
 
 # Configuration
+LAMBDA_FUNCTION_NAME=${1:-todo-api}
+CORS_ORIGIN=${2:-http://localhost:3001}
 STACK_NAME="todo-api-gateway"
-TEMPLATE_FILE="backend/api-gateway-config.yaml"
 REGION="us-east-1"
-LAMBDA_FUNCTION_NAME="todo-api"
+TEMPLATE_FILE="backend/api-gateway-config.yaml"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}🚀 Starting API Gateway deployment for Todo API...${NC}"
+echo -e "${BLUE}Lambda Function: ${LAMBDA_FUNCTION_NAME}${NC}"
+echo -e "${BLUE}CORS Origin: ${CORS_ORIGIN}${NC}"
+echo -e "${BLUE}Stack Name: ${STACK_NAME}${NC}"
+echo -e "${BLUE}Region: ${REGION}${NC}"
 
 # Check if AWS CLI is installed
 if ! command -v aws &> /dev/null; then
-    echo "❌ AWS CLI is not installed. Please install it first."
+    echo -e "${RED}❌ AWS CLI is not installed. Please install it first.${NC}"
     exit 1
 fi
 
-# Check if AWS credentials are configured
+# Check AWS credentials
 if ! aws sts get-caller-identity &> /dev/null; then
-    echo "❌ AWS credentials not configured. Please run: aws configure"
+    echo -e "${RED}❌ AWS credentials not configured. Run 'aws configure' first.${NC}"
     exit 1
 fi
 
-# Check if the Lambda function exists
-echo "🔍 Checking if Lambda function '$LAMBDA_FUNCTION_NAME' exists..."
-if aws lambda get-function --function-name $LAMBDA_FUNCTION_NAME --region $REGION &> /dev/null; then
-    echo "✅ Lambda function '$LAMBDA_FUNCTION_NAME' found"
+# Check if Lambda function exists
+echo -e "${BLUE}🔍 Checking if Lambda function '${LAMBDA_FUNCTION_NAME}' exists...${NC}"
+if aws lambda get-function --function-name "${LAMBDA_FUNCTION_NAME}" --region "${REGION}" &> /dev/null; then
+    echo -e "${GREEN}✅ Lambda function '${LAMBDA_FUNCTION_NAME}' found${NC}"
 else
-    echo "❌ Lambda function '$LAMBDA_FUNCTION_NAME' not found. Please deploy the Lambda function first."
+    echo -e "${RED}❌ Lambda function '${LAMBDA_FUNCTION_NAME}' not found${NC}"
+    echo -e "${YELLOW}💡 Make sure your Lambda function is deployed first${NC}"
     exit 1
 fi
 
-# Package the CloudFormation template (if needed)
-echo "📦 Preparing CloudFormation stack..."
+# Check if CloudFormation template exists
+if [[ ! -f "${TEMPLATE_FILE}" ]]; then
+    echo -e "${RED}❌ CloudFormation template not found: ${TEMPLATE_FILE}${NC}"
+    exit 1
+fi
 
 # Check if stack exists
-echo "🔍 Checking if CloudFormation stack '$STACK_NAME' exists..."
-if aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION &> /dev/null; then
-    echo "🔄 Stack exists. Updating..."
+echo -e "${BLUE}🔍 Checking if CloudFormation stack '${STACK_NAME}' exists...${NC}"
+if aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${REGION}" &> /dev/null; then
+    echo -e "${YELLOW}🔄 Stack exists. Updating...${NC}"
     
-    # Update the stack
+    # Update stack
     aws cloudformation update-stack \
-        --stack-name $STACK_NAME \
-        --template-body file://$TEMPLATE_FILE \
-        --parameters ParameterKey=LambdaFunctionName,ParameterValue=$LAMBDA_FUNCTION_NAME \
+        --stack-name "${STACK_NAME}" \
+        --template-body "file://${TEMPLATE_FILE}" \
+        --parameters ParameterKey=LambdaFunctionName,ParameterValue="${LAMBDA_FUNCTION_NAME}" \
+                     ParameterKey=CorsOrigin,ParameterValue="${CORS_ORIGIN}" \
         --capabilities CAPABILITY_IAM \
-        --region $REGION
+        --region "${REGION}"
     
-    echo "⏳ Waiting for stack update to complete..."
+    echo -e "${BLUE}⏳ Waiting for stack update to complete...${NC}"
     aws cloudformation wait stack-update-complete \
-        --stack-name $STACK_NAME \
-        --region $REGION
+        --stack-name "${STACK_NAME}" \
+        --region "${REGION}"
     
-    echo "✅ Stack updated successfully"
+    echo -e "${GREEN}✅ Stack updated successfully${NC}"
 else
-    echo "🆕 Stack does not exist. Creating..."
+    echo -e "${YELLOW}🆕 Stack does not exist. Creating...${NC}"
     
-    # Create the stack
+    # Create stack
     aws cloudformation create-stack \
-        --stack-name $STACK_NAME \
-        --template-body file://$TEMPLATE_FILE \
-        --parameters ParameterKey=LambdaFunctionName,ParameterValue=$LAMBDA_FUNCTION_NAME \
+        --stack-name "${STACK_NAME}" \
+        --template-body "file://${TEMPLATE_FILE}" \
+        --parameters ParameterKey=LambdaFunctionName,ParameterValue="${LAMBDA_FUNCTION_NAME}" \
+                     ParameterKey=CorsOrigin,ParameterValue="${CORS_ORIGIN}" \
         --capabilities CAPABILITY_IAM \
-        --region $REGION
+        --region "${REGION}"
     
-    echo "⏳ Waiting for stack creation to complete..."
+    echo -e "${BLUE}⏳ Waiting for stack creation to complete...${NC}"
     aws cloudformation wait stack-create-complete \
-        --stack-name $STACK_NAME \
-        --region $REGION
+        --stack-name "${STACK_NAME}" \
+        --region "${REGION}"
     
-    echo "✅ Stack created successfully"
+    echo -e "${GREEN}✅ Stack created successfully${NC}"
 fi
 
 # Get the API Gateway URL
-echo "🔗 Retrieving API Gateway URL..."
+echo -e "${BLUE}🔗 Retrieving API Gateway URL...${NC}"
 API_URL=$(aws cloudformation describe-stacks \
-    --stack-name $STACK_NAME \
-    --region $REGION \
+    --stack-name "${STACK_NAME}" \
+    --region "${REGION}" \
     --query 'Stacks[0].Outputs[?OutputKey==`TodosEndpoint`].OutputValue' \
     --output text)
 
-if [ -z "$API_URL" ]; then
-    echo "❌ Failed to retrieve API Gateway URL"
-    exit 1
-fi
-
-echo "✅ API Gateway deployed successfully!"
-echo "📍 API Gateway URL: $API_URL"
-
-# Create/update .env file with the new API URL
-echo "📝 Creating .env file with API Gateway URL..."
-cat > .env << EOF
+if [[ -n "${API_URL}" ]]; then
+    echo -e "${GREEN}✅ API Gateway URL: ${API_URL}${NC}"
+    
+    # Create/update .env file
+    echo -e "${BLUE}📝 Updating .env file...${NC}"
+    cat > .env << EOF
 # API Configuration
-REACT_APP_API_URL=$API_URL
+REACT_APP_API_URL=${API_URL}
 REACT_APP_API_TYPE=api-gateway
+REACT_APP_CORS_ORIGIN=${CORS_ORIGIN}
 
 # Development settings
 REACT_APP_DEV_MODE=true
 EOF
+    
+    echo -e "${GREEN}✅ .env file created with API Gateway URL${NC}"
+    
+    # Test the API Gateway
+    echo -e "${BLUE}🧪 Testing API Gateway endpoints...${NC}"
+    sleep 5  # Wait for API Gateway to be fully available
+    
+    if [[ -f "test-api-gateway.js" ]]; then
+        REACT_APP_API_URL="${API_URL}" node test-api-gateway.js
+    else
+        echo -e "${YELLOW}⚠️  Test script not found. Skipping tests.${NC}"
+    fi
+    
+    echo -e "${GREEN}🎉 Deployment complete!${NC}"
+    echo -e "${GREEN}📋 API Gateway URL: ${API_URL}${NC}"
+    echo -e "${GREEN}🌐 Your React app can now connect to the API Gateway${NC}"
+    echo -e "${GREEN}🚀 Start your React app with: npm start${NC}"
+    
+else
+    echo -e "${RED}❌ Failed to retrieve API Gateway URL${NC}"
+    echo -e "${YELLOW}💡 Check CloudFormation events for details:${NC}"
+    aws cloudformation describe-stack-events \
+        --stack-name "${STACK_NAME}" \
+        --region "${REGION}" \
+        --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`||ResourceStatus==`UPDATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' \
+        --output table
+    exit 1
+fi
 
-echo "✅ .env file created with API Gateway configuration"
-echo ""
-echo "🎯 Next steps:"
-echo "1. Update your React app to use the new API Gateway URL"
-echo "2. Test the API endpoints:"
-echo "   GET    $API_URL"
-echo "   POST   $API_URL"
-echo "   PUT    $API_URL/{id}"
-echo "   DELETE $API_URL/{id}"
-echo ""
-echo "🧪 Test CORS with:"
-echo "   curl -H \"Origin: http://localhost:3001\" -H \"Access-Control-Request-Method: GET\" \"
-        -X OPTIONS $API_URL\""
+# Display useful commands
+echo -e "${BLUE}📋 Useful commands:${NC}"
+echo -e "  View stack: aws cloudformation describe-stacks --stack-name ${STACK_NAME} --region ${REGION}"
+echo -e "  View logs: aws logs tail /aws/lambda/${LAMBDA_FUNCTION_NAME} --follow"
+echo -e "  Test API: curl -H 'Origin: ${CORS_ORIGIN}' ${API_URL}"
+echo -e "  Delete stack: aws cloudformation delete-stack --stack-name ${STACK_NAME} --region ${REGION}"
