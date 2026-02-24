@@ -5,7 +5,7 @@ import './TodoList.css';
 function TodoList({ todos, onToggleTodo, onDeleteTodo, onEditTodo }) {
   if (todos.length === 0) {
     return (
-      <div className="empty-state">
+      <div className="todo-list-empty">
         <p>No todos yet. Add one above!</p>
       </div>
     );
