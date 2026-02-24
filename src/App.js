@@ -17,17 +17,32 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_URL}/todos`);
+      
+      console.log('Fetching from:', `${API_URL}/todos`);
+      
+      const response = await fetch(`${API_URL}/todos`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch todos');
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to fetch todos: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
+      console.log('Fetched data:', data);
       setTodos(data.todos || []);
     } catch (err) {
-      setError(err.message);
       console.error('Error fetching todos:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -45,10 +60,12 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ text }),
+        mode: 'cors'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add todo');
+        const errorText = await response.text();
+        throw new Error(`Failed to add todo: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const newTodo = await response.json();
@@ -70,10 +87,12 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ completed: !todo.completed }),
+        mode: 'cors'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update todo');
+        const errorText = await response.text();
+        throw new Error(`Failed to update todo: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const updatedTodo = await response.json();
@@ -90,10 +109,12 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/todos/${id}`, {
         method: 'DELETE',
+        mode: 'cors'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete todo');
+        const errorText = await response.text();
+        throw new Error(`Failed to delete todo: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
@@ -111,10 +132,12 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ text: newText }),
+        mode: 'cors'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update todo');
+        const errorText = await response.text();
+        throw new Error(`Failed to update todo: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const updatedTodo = await response.json();
@@ -136,6 +159,7 @@ function App() {
         completedTodos.map(todo => 
           fetch(`${API_URL}/todos/${todo.id}`, {
             method: 'DELETE',
+            mode: 'cors'
           })
         )
       );
@@ -165,7 +189,10 @@ function App() {
     return (
       <div className="App">
         <div className="todo-container">
-          <div className="loading">Loading todos...</div>
+          <div className="loading">
+            <div className="loading-spinner"></div>
+            Loading todos...
+          </div>
         </div>
       </div>
     );
@@ -181,8 +208,12 @@ function App() {
         
         {error && (
           <div className="error-message">
-            {error}
-            <button onClick={fetchTodos} className="retry-btn">Retry</button>
+            <div className="error-content">
+              <strong>Connection Error:</strong> {error}
+              <br />
+              <small>Make sure the Lambda function URL is properly configured with CORS and public access.</small>
+            </div>
+            <button onClick={fetchTodos} className="retry-btn">Retry Connection</button>
           </div>
         )}
         
