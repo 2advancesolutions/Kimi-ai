@@ -11,6 +11,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [initialized, setInitialized] = useState(false);
 
   // Fetch todos from API
   const fetchTodos = async () => {
@@ -32,11 +33,39 @@ function App() {
       const todoList = data.todos || data || [];
       setTodos(Array.isArray(todoList) ? todoList : []);
       
+      // Initialize with a sample todo if list is empty on first load
+      if (!initialized && todoList.length === 0) {
+        await initializeSampleTodo();
+      }
+      setInitialized(true);
+      
     } catch (err) {
       console.error('Error fetching todos:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Initialize with a sample todo
+  const initializeSampleTodo = async () => {
+    try {
+      const sampleTodo = {
+        text: 'Welcome! This is your first todo item - click to mark it complete or delete it!'
+      };
+      
+      const response = await fetch(
+        buildApiUrl(API_CONFIG.ENDPOINTS.TODOS),
+        getRequestConfig('POST', sampleTodo)
+      );
+      
+      await handleApiError(response);
+      const newTodo = await response.json();
+      setTodos([newTodo]);
+      console.log('Initialized with sample todo:', newTodo);
+    } catch (err) {
+      console.error('Error initializing sample todo:', err);
+      // Don't set error state here, as this is just a nice-to-have
     }
   };
 
