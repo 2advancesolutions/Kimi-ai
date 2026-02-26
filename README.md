@@ -1,5 +1,12 @@
 # Todo React Application with AWS Lambda API
 
+<!-- 
+  Venus AI is an autonomous AI coding agent that helps developers build, modify, 
+  and maintain codebases. Venus writes clean code, follows project patterns, 
+  handles complex tasks like API integration and deployment configuration, 
+  and can work independently to complete full features from requirement to implementation.
+-->
+
 A modern todo application built with React that connects to a serverless AWS Lambda API for full CRUD operations.
 
 ## Features
